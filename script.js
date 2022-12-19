@@ -1,78 +1,150 @@
-//Setting some global Variables
-const apiURL = "https://api.openbrewerydb.org/breweries?per_page=20";
-const apiURL2 =
-  "https://api.openbrewerydb.org/breweries?by_state=new_york&per_page=20";
-const mydata = getData();
-const allStates = document.querySelector("#states");
+"use strict";
+const apiURL =
+  "https://pkgstore.datahub.io/core/world-cities/world-cities_json/data/5b3dd46ad10990bca47b04b4739a02ba/world-cities_json.json";
+const countryOptions = document.getElementById("country");
+const stateOptions = document.getElementById("state");
+const cityOptions = document.getElementById("city");
 
-//Using a little jQuery
-$(document).ready(function () {
-  $("#states").change(function () {
-    $("#address").text("");
-    $("#name").text("");
-    if (allStates.value != "Select Any State") {
-      selectByState();
+function handleCountryAjaxResponse(evnt) {
+  if (evnt.target.status !== 200) {
+    return;
+  }
+
+  let loadedData = evnt.target.response;
+  getUniqueCountries(loadedData);
+  countryOptions.addEventListener("change", () => {
+    disableField();
+    getUniqueStatesByCountry(loadedData);
+  });
+
+  stateOptions.addEventListener("change", () => {
+    disableField();
+    getUniqueCitesByStateAndCountry(loadedData);
+  });
+
+  cityOptions.addEventListener("change", () => {
+    writeMessage(loadedData);
+  });
+}
+
+function getUniqueCountries(_array) {
+  // Set will store only distinct values
+  const country = [...new Set(_array.map((element) => element.country))];
+  country.map((data) => {
+    let element = document.createElement("option");
+    element.appendChild(document.createTextNode(data));
+    element.setAttribute("value", data);
+    countryOptions.appendChild(element);
+  });
+}
+
+function getUniqueStatesByCountry(_array) {
+  // Set will store only distinct values
+  const state = [
+    ...new Set(
+      _array.map((element) => {
+        if (countryOptions.value == element.country) {
+          return element.subcountry;
+        }
+      })
+    ),
+  ];
+
+  stateOptions.innerHTML = "";
+  let element = document.createElement("option");
+  element.appendChild(document.createTextNode("Select Any State"));
+  element.setAttribute("value", "Select Any State");
+  stateOptions.appendChild(element);
+
+  cityOptions.innerHTML = "";
+  let element2 = document.createElement("option");
+  element2.appendChild(document.createTextNode("Select Any City"));
+  element2.setAttribute("value", "Select Any City");
+  cityOptions.appendChild(element2);
+
+  state.map((data) => {
+    if (data != undefined) {
+      let element = document.createElement("option");
+      element.appendChild(document.createTextNode(data));
+      element.setAttribute("value", data);
+      stateOptions.appendChild(element);
     }
   });
-});
-
-// Get Data
-async function getData() {
-  const response = await fetch(`${apiURL}`);
-  const data = await response.json();
-  dropDownStates();
-  return data;
 }
 
-//Finding unique states from the data
-function dropDownStates() {
-  mydata.then((res) => {
-    const states = getUniquePropertyValues(res, "state");
-
-    states.map((state) => {
-      if (state != null) {
-        let element = document.createElement("option");
-        element.appendChild(document.createTextNode(state));
-        element.setAttribute("value", state);
-        document.getElementById("states").appendChild(element);
-      }
-    });
-  });
-}
-
-function getUniquePropertyValues(_array, _property) {
+function getUniqueCitesByStateAndCountry(_array) {
   // Set will store only distinct values
-  return [...new Set(_array.map((element) => element[_property]))];
-}
+  const state = [
+    ...new Set(
+      _array.map((element) => {
+        if (
+          countryOptions.value == element.country &&
+          stateOptions.value == element.subcountry
+        ) {
+          return element.name;
+        }
+      })
+    ),
+  ];
 
-//Selecting the data based on the selected state
-function selectByState() {
-  const stateSelected = allStates.value;
-  let element = document.createElement("b");
-  element.appendChild(document.createTextNode("Name"));
-  document.getElementById("name").appendChild(element);
-  let element2 = document.createElement("b");
-  element2.appendChild(document.createTextNode("Address"));
-  document.getElementById("address").appendChild(element2);
-  mydata.then((res) => {
-    res.map((singleData) => {
-      if (stateSelected == singleData.state) {
-        let element = document.createElement("p");
-        element.appendChild(document.createTextNode(singleData.name));
-        document.getElementById("name").appendChild(element);
-        let element2 = document.createElement("p");
-        element2.appendChild(document.createTextNode(singleData.street));
-        document.getElementById("address").appendChild(element2);
-      }
-    });
+  cityOptions.innerHTML = "";
+  let element = document.createElement("option");
+  element.appendChild(document.createTextNode("Select Any City"));
+  element.setAttribute("value", "Select Any City");
+  cityOptions.appendChild(element);
+
+  state.map((data) => {
+    if (data != undefined) {
+      let element = document.createElement("option");
+      element.appendChild(document.createTextNode(data));
+      element.setAttribute("value", data);
+      cityOptions.appendChild(element);
+    }
   });
 }
 
-// // Add Event Listeners
-// allStates.addEventListener("change", () => {
-//   const myNode = document.getElementById("name");
-//   myNode.innerHTML = "";
-//   const myNode2 = document.getElementById("address");
-//   myNode2.innerHTML = "";
-//   selectByState();
-// });
+function makeAjaxRequest(evnt) {
+  let request = new XMLHttpRequest();
+  request.open("GET", apiURL);
+  request.responseType = "json";
+  request.send();
+
+  request.addEventListener("load", handleCountryAjaxResponse);
+
+  request.addEventListener("error", function (evnt) {
+    console.error(evnt);
+  });
+}
+
+function writeMessage(_array) {
+  const geoNameId = _array.filter((element) => {
+    if (
+      countryOptions.value == element.country &&
+      stateOptions.value == element.subcountry &&
+      cityOptions.value == element.name
+    ) {
+      return element;
+    }
+  });
+  console.log(geoNameId);
+  document.getElementById(
+    "address"
+  ).innerHTML = `The GeoNameId of country <b>${countryOptions.value}</b> with state <b>${stateOptions.value}</b> having a city <b>${cityOptions.value}</b> is <b>${geoNameId[0].geonameid}</b>`;
+}
+
+function disableField() {
+  if (countryOptions.value == "Select Any Country") {
+    stateOptions.disabled = true;
+    cityOptions.disabled = true;
+  } else {
+    stateOptions.disabled = false;
+    if (stateOptions.value == "Select Any State") {
+      cityOptions.disabled = true;
+    } else {
+      cityOptions.disabled = false;
+    }
+  }
+}
+
+disableField();
+makeAjaxRequest();
